@@ -39,4 +39,11 @@ public class VectorController {
 	public String ask(@RequestParam String conversationId, @RequestParam String question) {
 		return ragService.ask(conversationId, question);
 	}
+
+	//http://localhost:8080/vector/ask-by-source?conversationId=2&question=How many annual leaves are allowed?&source=employee-policy.txt
+	@GetMapping("/ask-by-source")
+	public String askBySource(@RequestParam String conversationId,@RequestParam String question, @RequestParam String source) {
+
+		return ragService.askBySource(conversationId,question, source);
+	}
 }

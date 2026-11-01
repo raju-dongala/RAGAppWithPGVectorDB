@@ -63,8 +63,33 @@ public class RagService {
 
 				Question:
 				{question}
-				""")
-				.param("context", context).param("question", question)).advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
+				""").param("context", context).param("question", question))
+				.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId)).call().content();
+	}
+
+	public String askBySource(String conversationId,String question, String source) {
+
+		List<Document> documents = vectorStore.similaritySearch(
+				SearchRequest.builder().query(question).topK(3).filterExpression("source == '" + source + "'").build());
+
+		if (documents.isEmpty()) {
+			return "No relevant documents found.";
+		}
+
+		String context = documents.stream().map(Document::getText).collect(Collectors.joining("\n"));
+
+		return chatClient.prompt().system("""
+				Answer only using the provided context.
+				If the answer is unavailable, say:
+				I don't have enough information.
+				""").user(u -> u.text("""
+				Context:
+				{context}
+
+				Question:
+				{question}
+				""").param("context", context).param("question", question))
+				.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
 				.call().content();
 	}
 }
