@@ -1,0 +1,13 @@
+Employees are entitled to 20 days of annual leave per year.
+
+Annual leave must be applied through the HR portal.
+
+Employees should submit leave requests at least 3 working days in advance.
+
+Managers are responsible for approving or rejecting leave requests.
+
+Employees can download their salary slips from the Payroll section.
+
+Employees can update their phone number and address from the Profile section.
+
+Password resets can be performed using the Forgot Password option.
