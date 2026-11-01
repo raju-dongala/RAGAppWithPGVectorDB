@@ -42,7 +42,7 @@ public class DocumentService {
 	
 	public void loadPdf() {
 
-		Resource resource = new ClassPathResource("docs/corejava_Ratan.pdf");
+		Resource resource = new ClassPathResource("docs/employee-policy.pdf");
 
 		PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource);
 
