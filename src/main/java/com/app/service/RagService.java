@@ -40,23 +40,103 @@ public class RagService {
 		return vectorStore.similaritySearch(SearchRequest.builder().query(question).topK(1).build());
 	}
 
+	/*
+	 * public String ask(String conversationId, String question) {
+	 * 
+	 * List<Document> documents = vectorStore
+	 * .similaritySearch(SearchRequest.builder().query(question).topK(2).build());
+	 * 
+	 * System.out.println(documents);
+	 * 
+	 * String context =
+	 * documents.stream().map(Document::getText).collect(Collectors.joining("\n"));
+	 * 
+	 * return chatClient.prompt().system(""" You are an Employee Management System
+	 * assistant.
+	 * 
+	 * Follow these rules: 1. Answer only using the provided context. 2. Do not use
+	 * your own knowledge. 3. Never invent or assume information. 4. If the answer
+	 * is not available in the context, respond with:
+	 * "I don't have enough information to answer this question." 5. Give answers in
+	 * simple and clear language. 6. Use bullet points when explaining multiple
+	 * details. """).user(u -> u.text(""" Use the following context to answer the
+	 * question.
+	 * 
+	 * CONTEXT: {context}
+	 * 
+	 * QUESTION: {question}
+	 * 
+	 * ANSWER: """).param("context", context).param("question", question))
+	 * .advisors(a -> a.param(ChatMemory.CONVERSATION_ID,
+	 * conversationId)).call().content(); }
+	 */
+
 	public String ask(String conversationId, String question) {
+		
+		String searchQuery = transformQuery(conversationId, question);
 
-		List<Document> documents = vectorStore
-				.similaritySearch(SearchRequest.builder().query(question).topK(2).build());
+		System.out.println("Original Question: " + question);
+		System.out.println("Transformed Query: " + searchQuery);
+		
+		// Step 1: Retrieve relevant documents
+		List<Document> documents = vectorStore.similaritySearch(
+		        SearchRequest.builder()
+		                .query(searchQuery)
+		                .topK(3)
+		                .build()
+		);
 
-		System.out.println(documents);
+		// Step 1: Retrieve relevant documents
+	//	List<Document> documents = vectorStore
+		//		.similaritySearch(SearchRequest.builder().query(question).topK(3).build());
+
+		String context = documents.stream().map(Document::getText).collect(Collectors.joining("\n"));
+
+		// Step 2: Generate answer using RAG + Chat Memory
+		return chatClient.prompt().system("""
+				You are an Employee Management System assistant.
+
+				Rules:
+				1. Answer using the provided document context.
+				2. Never invent information.
+				3. Use conversation history to understand follow-up questions.
+				4. If information is unavailable in the documents,
+				   say "I don't have enough information to answer this question."
+				5. Give simple and clear answers.
+				6. Use bullet points when needed.
+				""").user(u -> u.text("""
+				Document Context:
+				{context}
+
+				Current Question:
+				{question}
+				""").param("context", context).param("question", question))
+				.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId)).call().content();
+	}
+
+	public String askBySource(String conversationId, String question, String source) {
+		// .similarityThreshold(0.85) means accuracy of answers get from the llm
+		List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder().query(question).topK(3)
+				.similarityThreshold(0.40).filterExpression("source == '" + source + "'").build());
+
+		if (documents.isEmpty()) {
+			return "No relevant documents found.";
+		}
 
 		String context = documents.stream().map(Document::getText).collect(Collectors.joining("\n"));
 
 		return chatClient.prompt().system("""
 				You are an Employee Management System assistant.
 
-				Answer the user's question only using the
-				provided context.
-
-				If the answer is not available in the context,
-				say "I don't have enough information."
+				Follow these rules:
+				1. Answer only using the provided context.
+				2. Do not use your own knowledge.
+				3. Never invent or assume information.
+				4. If the answer is not available in the context,
+				   respond with:
+				   "I don't have enough information to answer this question."
+				5. Give answers in simple and clear language.
+				6. Use bullet points when explaining multiple details.
 				""").user(u -> u.text("""
 				Context:
 				{context}
@@ -66,30 +146,27 @@ public class RagService {
 				""").param("context", context).param("question", question))
 				.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId)).call().content();
 	}
+	
+	
+	private String transformQuery(String conversationId, String question) {
 
-	public String askBySource(String conversationId,String question, String source) {
+	    return chatClient.prompt()
+	            .system("""
+	                You are a query rewriting assistant.
 
-		List<Document> documents = vectorStore.similaritySearch(
-				SearchRequest.builder().query(question).topK(3).filterExpression("source == '" + source + "'").build());
+	                Your task is to rewrite the user's latest question
+	                into a standalone search query.
 
-		if (documents.isEmpty()) {
-			return "No relevant documents found.";
-		}
+	                Use conversation history to understand references
+	                such as them, it, that, those, etc.
 
-		String context = documents.stream().map(Document::getText).collect(Collectors.joining("\n"));
-
-		return chatClient.prompt().system("""
-				Answer only using the provided context.
-				If the answer is unavailable, say:
-				I don't have enough information.
-				""").user(u -> u.text("""
-				Context:
-				{context}
-
-				Question:
-				{question}
-				""").param("context", context).param("question", question))
-				.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
-				.call().content();
+	                Return only the rewritten question.
+	                Do not answer the question.
+	                """)
+	            .user(question)
+	            .advisors(a -> a.param(
+	                    ChatMemory.CONVERSATION_ID, conversationId))
+	            .call()
+	            .content();
 	}
 }
